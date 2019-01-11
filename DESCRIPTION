@@ -1,11 +1,22 @@
 Package: scRNAzirf
 Type: Package
-Title: What the Package Does (Title Case)
+Title: This package uses random forests to fit zero-inflated count data
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Author@R: person("Daniel", "Conn", email="djconn17@gmail.com", 
+                role = c("aut", "cre"))
+Author: Daniel Conn [aut, cre]                
+Maintainer: Daniel Conn <djconn17@gmail.com>
+Depends: R (>= 3.5.0)
+Imports:
+    randomForest,
+    stats
+Suggests:
+    mpath
+Description: This package uses a new random forest based method
+    to estimate the count parameters nonparametrically in 
+    zero-inflated count models.  This package was developed
+    for the analysis of single-cell RNA-seq data.
+License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 6.1.1

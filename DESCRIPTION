@@ -9,7 +9,8 @@ Maintainer: Daniel Conn <djconn17@gmail.com>
 Depends: R (>= 3.5.0)
 Imports:
     randomForest,
-    stats
+    stats,
+    cvTools
 Suggests:
     mpath
 Description: This package uses a new random forest based method

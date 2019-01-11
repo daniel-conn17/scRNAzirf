@@ -45,7 +45,7 @@ are kept across EM iterations}
 \item{nlambda}{number of folds of cross-validation}
 }
 \value{
-A random forest object
+A list.
 }
 \description{
 Fit zero-inflated random forests given a pre-specified set of

@@ -19,7 +19,7 @@
 #' @param iter_keep_xsi boolean, if TRUE zero-inflation model coefficients
 #'                      are kept across EM iterations
 #' @param nlambda number of folds of cross-validation
-#' @return A random forest object
+#' @return A list.
 #' @export
 zirf_fit <- function(x, z, y, rounds, mtry,
                      ntree=100, nodesize=5,

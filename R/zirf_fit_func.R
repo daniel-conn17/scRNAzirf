@@ -136,8 +136,8 @@ zirf_fit <- function(x, z, y, rounds, mtry,
         cx <- x[cz0, , drop=F]
         cy <- y[cz0]
         cdat <- data.frame(cy=cy, cx)
-        rf_fit <- stats::predict(cx, cy, mtry=mtry, ntree=1,
-                               nodesize=nodesize)
+        rf_fit <- randomForest::randomForest(cx, cy, mtry=mtry, ntree=1,
+                                             nodesize=nodesize)
         if(i == rounds){
           newdat_tree_preds[, j] <- stats::predict(rf_fit, newdata=newx)
           importance_measures[, j] <- randomForest::importance(rf_fit, type=2)

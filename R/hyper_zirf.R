@@ -21,52 +21,31 @@
 #' @param nlambda number of folds of cross-validation
 #' @return A list.
 #' @export
-zirf_fit <- function(x, z, y, rounds, mtry,
-                     ntree=100, nodesize=5,
-                     count_coef=NULL, zero_coef=NULL,
-                     newx=NULL, newz=NULL,
-                     iter_keep_pi=F, iter_keep_preds=F,
-                     iter_keep_xsi=F, nlambda=10){
-  #add a character to start of every variable so that we don't run into other issues
-  # to get the original names run the following command:
-  # substring(names(zilm_dat), 5)
+hyper_zirf_fit <- function(x, z, y, rounds, mtry,
+                           ntree=100, nodesize=5,
+                           count_coef=NULL, zero_coef=NULL,
+                           newx=NULL, newz=NULL,
+                           iter_keep_pi=F, iter_keep_preds=F,
+                           iter_keep_xsi=F, nlambda=10){
+  yname <- deparse(substitute(y))
   zero_coef_og <- zero_coef
   x_ind <- 1:dim(x)[2]
   z_ind <- (dim(x)[2] + 1):(dim(x)[2] + dim(z)[2])
-  nb_part01 <- paste("y", "~ ", collapse="")
-  if(class(x) == "data.frame"){
-    x_names <- names(x)
-    names(x) <- paste("chr_", names(x), sep="")
-    names(x) <- gsub("\\.", "_", names(x))
-    nb_part02 <- paste(names(x), collapse="+")
-    zero_part <- paste0("|", paste0(names(z), collapse="+"))
-    if(!is.null(newx)){
-      names(newx) <- names(x)
-    }
-  }
   if(class(x) == "matrix"){
-    x_names <- colnames(x)
-    colnames(x) <- paste("chr_", colnames(x), sep="")
-    colnames(x) <- gsub("-", "_", colnames(x))
-    nb_part02 <- paste(colnames(x), collapse=" + ")
-    zero_part <- paste0("|", paste0(colnames(z), collapse=" + "))
-    if(!is.null(newx)){
-      colnames(newx) <- colnames(x)
-    }
+      x <- as.data.frame(x, stringsAsFactors=FALSE)
   }
-  mod_string <- paste(nb_part01, nb_part02, zero_part, sep="")
-  mod_formula <- stats::as.formula(mod_string)
-  if(class(y) == "data.frame"){
-    y_names <- names(y)
-    names(y) <- paste("chr_", names(y), sep="")
-    names(y) <- gsub("\\.", "_", names(y))
+  if(class(z) == "matrix"){
+    z <- as.data.frame(z, stringsAsFactors=FALSE)
   }
-  if(class(y) == "matrix"){
-    y_names <- colnames(y)
-    colnames(y) <- paste("chr_", colnames(y), sep="")
-    colnames(y) <- gsub("\\.", "_", colnames(y))
+  if(!is.null(newx)){
+    if(class(newx) == "matrix"){
+        newx <- as.data.frame(newx, stringsAsFactors=FALSE)
+       }
+    names(newx) <- names(x)
   }
-  zilm_dat <- data.frame(x, z, y=y)
+  if(class(y) == "matrix"){y <- as.data.fame(y, stringsAsFactors=FALSE)}
+  zilm_dat <- data.frame(x, z, y)
+  names(zilm_dat)[dim(zilm_dat)[2]] <- yname
   if(is.null(newx)){
     newx <- as.data.frame(x)
     newz <- as.matrix(z)
@@ -77,34 +56,24 @@ zirf_fit <- function(x, z, y, rounds, mtry,
     newz <- as.matrix(newz)
     newz <- as.matrix(cbind(rep(1, nrow(newz)), newz))
   }
-  #fit initial zip model, comment out the next line, if desired
-  #normally this should be set to 100-3000
-  #i've commented this out because the additional source of randomness makes
-  #predictions harder to compare
-  #quick_zilm_dat <- zilm_dat[sample(1:dim(zilm_dat)[1], dim(zilm_dat)[1]), ]
-  quick_zilm_dat <- zilm_dat
-  #ptm <- proc.time()
-  names(quick_zilm_dat)[dim(quick_zilm_dat)[2]] <- "y"
-  if(is.null(count_coef)){
+  mod_formula <- XZ_to_form(yname, x, z)
 
-    pois_mod <- mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
-                          penalty.factor.zero=0,
-                          family="poisson",
-                          plot.it = F)
-    #print(proc.time() - ptm)
-    pois_mod$fit$theta[pois_mod$lambda.which]
+  pois_mod <- mpath::cv.zipath(mod_formula, data = zilm_dat,  nlambda=nlambda,
+                        penalty.factor.zero=0,
+                        family="poisson",
+                        plot.it = F)
 
-    #apply initial E-step to get initial probabilities of inclusion
-    pois_coef <- stats::coef(pois_mod)
-    zero_coef <- pois_coef$zero
-    count_coef <- pois_coef$count
-  }
+  ##apply initial E-step to get initial probabilities of inclusion
+  pois_coef <- stats::coef(pois_mod)
+  zero_coef <- pois_coef$zero
+  count_coef <- pois_coef$count
   zdat <- zilm_dat[, z_ind, drop=F]
   zdat <- as.matrix(cbind(rep(1, nrow(zdat)), zdat))
   xdat <- zilm_dat[, x_ind, drop=F]
   xdat <- as.matrix(cbind(rep(1, nrow(xdat)), xdat))
   xdat_df <- as.data.frame(xdat[, -1, drop=F])
-
+  linear_cut <- xdat%*%count_coef
+  xdat_df <- data.frame(xdat_df, linear_cut=linear_cut)
   #Next apply formula (9) of Wang et al (2014) from Stats in Medicine
   #We know z_{i}=0 for these observations
   sure_nonzero_ind <- which(y != 0)
@@ -124,6 +93,7 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   keep_preds <- matrix(NA, nrow=rounds, ncol=dim(xdat_df)[1])
   keep_pi <- matrix(NA, nrow=rounds, ncol=dim(xdat_df)[1])
   keep_xsi <- matrix(NA, nrow=rounds, ncol=length(zero_coef))
+
   for(i in 1:rounds){
       #rf_list <- vector("list", length=ntree)
       if(i == rounds){

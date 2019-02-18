@@ -1,2 +1,3 @@
+^vim_metric_test$
 ^.*\.Rproj$
 ^\.Rproj\.user$

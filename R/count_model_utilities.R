@@ -21,6 +21,32 @@ XZ_to_form <- function(out_name, X, Z){
   out_form <- stats::as.formula(out_form)
 }
 
+#' Produce formula from X
+#'
+#' The function takes data.frames X, and it produces
+#' a formula that could be used by other functions such
+#' as pscl::zeroinfl.
+#'
+#' @param out_name outcome name
+#' @param X design matrix for count model, should be a data.frame
+#' @return A formula
+#' @export
+X_to_form <- function(out_name=NULL, X){
+  X <- as.data.frame(X)
+  if(!is.null(out_name)){
+    X <- X[, names(X) != out_name]
+  }
+  x_names <- names(X)
+  x_term <- paste(x_names, collapse = "+")
+  if(!is.null(out_name)){
+    out_form <- paste(out_name, "~ ", x_term)
+  }
+  if(is.null(out_name)){
+    out_form <- paste("~ ", x_term)
+  }
+  out_form <- stats::as.formula(out_form)
+}
+
 #' ZIP model pdf
 #'
 #' Evaluates zip model at particular value k.

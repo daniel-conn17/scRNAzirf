@@ -10,7 +10,8 @@ Depends: R (>= 3.5.0)
 Imports:
     randomForest,
     stats,
-    cvTools
+    cvTools,
+    PRROC
 Suggests:
     mpath
 Description: This package uses a new random forest based method

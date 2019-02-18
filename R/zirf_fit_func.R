@@ -129,7 +129,7 @@ zirf_fit <- function(x, z, y, rounds, mtry,
       if(i == rounds){
         importance_measures <- matrix(NA, dim(x)[2], ntree)
       }
-      rf_out <- for(j in 1:ntree){
+      for(j in 1:ntree){
         #first generate values of Z for each individual
         czi <- stats::rbinom(n, 1, probi)
         cz0 <- which(czi == 0)

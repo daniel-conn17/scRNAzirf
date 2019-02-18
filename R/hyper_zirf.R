@@ -19,6 +19,8 @@
 #' @param iter_keep_xsi boolean, if TRUE zero-inflation model coefficients
 #'                      are kept across EM iterations
 #' @param nlambda number of folds of cross-validation
+#' @param dimension_reduction If TRUE, dimension reduction will be applied.  In this case,
+#'                            permutation vims will be calculated.
 #' @return A list.
 #' @export
 hyper_zirf_fit <- function(x, z, y, rounds, mtry,
@@ -26,7 +28,7 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
                            count_coef=NULL, zero_coef=NULL,
                            newx=NULL, newz=NULL,
                            iter_keep_pi=F, iter_keep_preds=F,
-                           iter_keep_xsi=F, nlambda=10){
+                           iter_keep_xsi=F, nlambda=10, dimension_reduction=T){
   yname <- deparse(substitute(y))
   zero_coef_og <- zero_coef
   x_ind <- 1:dim(x)[2]
@@ -67,19 +69,24 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
   pois_coef <- stats::coef(pois_mod)
   zero_coef <- pois_coef$zero
   count_coef <- pois_coef$count
-  zdat <- zilm_dat[, z_ind, drop=F]
-  zdat <- as.matrix(cbind(rep(1, nrow(zdat)), zdat))
-  xdat <- zilm_dat[, x_ind, drop=F]
-  xdat <- as.matrix(cbind(rep(1, nrow(xdat)), xdat))
-  xdat_df <- as.data.frame(xdat[, -1, drop=F])
-  linear_cut <- xdat%*%count_coef
-  xdat_df <- data.frame(xdat_df, linear_cut=linear_cut)
+  z_mat_int <- zilm_dat[, z_ind, drop=F]
+  z_mat_int <- as.matrix(cbind(rep(1, nrow(z_mat_int)), z_mat_int))
+  #x is a data.frame without the intercept.
+  #This is appropriate for using with randomForest, but it won't work for
+  #matrix multiplication.  We need a matrix instead of a data.frame and
+  #we need the intercept.
+  x_mat_int <- zilm_dat[, x_ind, drop=F]
+  x_mat_int <- as.matrix(cbind(rep(1, nrow(x_mat_int)), x_mat_int))
+  linear_cut <- x_mat_int%*%count_coef
+  x <- data.frame(x, linear_cut=linear_cut)
+  newx_linear_cut <- as.matrix(cbind(rep(1, dim(newx)[1]), newx))%*%count_coef
+  newx <- data.frame(newx, linear_cut=newx_linear_cut)
   #Next apply formula (9) of Wang et al (2014) from Stats in Medicine
   #We know z_{i}=0 for these observations
   sure_nonzero_ind <- which(y != 0)
   y1 <- y > 0
-  logit_pi <- zdat%*%zero_coef
-  log_init_pois <- xdat%*%count_coef
+  logit_pi <- z_mat_int%*%zero_coef
+  log_init_pois <- x_mat_int%*%count_coef
   expit <- function(x){1/(1 + exp(-x))}
   probi <- expit(logit_pi)
   mui <- exp(log_init_pois)
@@ -87,13 +94,13 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
   probi[y1] <- 0
   #edit this now
   n <- dim(x)[1]
+  nnew <- dim(newx)[1]
   #ptm <- proc.time()
-  tree_preds <- matrix(NA, nrow=dim(xdat_df)[1], ncol=ntree)
-  newdat_tree_preds <- matrix(NA, nrow=dim(newx)[1], ncol=ntree)
-  keep_preds <- matrix(NA, nrow=rounds, ncol=dim(xdat_df)[1])
-  keep_pi <- matrix(NA, nrow=rounds, ncol=dim(xdat_df)[1])
+  tree_preds <- matrix(NA, nrow=n, ncol=ntree)
+  newdat_tree_preds <- matrix(NA, nrow=nnew, ncol=ntree)
+  keep_preds <- matrix(NA, nrow=rounds, ncol=n)
+  keep_pi <- matrix(NA, nrow=rounds, ncol=n)
   keep_xsi <- matrix(NA, nrow=rounds, ncol=length(zero_coef))
-
   for(i in 1:rounds){
       #rf_list <- vector("list", length=ntree)
       if(i == rounds){
@@ -112,7 +119,7 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
           newdat_tree_preds[, j] <- stats::predict(rf_fit, newdata=newx)
           importance_measures[, j] <- randomForest::importance(rf_fit, type=2)
         } else {
-          tree_preds[, j] <- stats::predict(rf_fit, newdata=xdat_df)
+          tree_preds[, j] <- stats::predict(rf_fit, newdata=x)
         }
       }
       #print(proc.time() - ptm)
@@ -124,12 +131,12 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
       if(sum(is.na(probi)) > 0){browser()}
       if(sum(is.nan(probi)) > 0){browser()}
       if(any(probi < 0 | probi > 1)){browser()}
-      model_zero <- suppressWarnings(stats::glm.fit(zdat, probi,
+      model_zero <- suppressWarnings(stats::glm.fit(z_mat_int, probi,
                               family = stats::binomial(link = "logit"),
                               start = zero_coef,
                               control=list(maxit=1000)))
       zero_coef <-  stats::coef(model_zero)
-      logit_pi <- zdat%*%zero_coef
+      logit_pi <- z_mat_int%*%zero_coef
       probi <- expit(logit_pi)
       probi <- probi/(probi + (1 - probi)*stats::dpois(0, mui))
       probi[y1] <- 0

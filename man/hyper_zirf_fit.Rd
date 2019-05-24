@@ -6,9 +6,11 @@
 tuning parameters.}
 \usage{
 hyper_zirf_fit(x, z, y, rounds, mtry, ntree = 100, nodesize = 5,
-  count_coef = NULL, zero_coef = NULL, newx = NULL, newz = NULL,
-  iter_keep_pi = F, iter_keep_preds = F, iter_keep_xsi = F,
-  nlambda = 10)
+  perm_frac = 0.75, count_coef = NULL, zero_coef = NULL,
+  newx = NULL, newz = NULL, iter_keep_pi = F, iter_keep_preds = F,
+  iter_keep_xsi = F, nlambda = 10, dimension_reduction = T,
+  MAST_pval = NULL, pval_threshold = NULL, MAST_fc = NULL,
+  fc_threshold = NULL, pca_genes = NULL, inputTF = NULL)
 }
 \arguments{
 \item{x}{Matrix or data.frame of covariates for the count part
@@ -27,6 +29,9 @@ part of the model.}
 
 \item{nodesize}{controls depth of regression trees}
 
+\item{perm_frac}{what percentage of observations should be used for fitting the model
+versus estimating the vims}
+
 \item{count_coef}{values for initial estimate of count model.}
 
 \item{zero_coef}{values for initial estimate of zero-inflation model.}
@@ -43,6 +48,23 @@ part of the model.}
 are kept across EM iterations}
 
 \item{nlambda}{number of folds of cross-validation}
+
+\item{dimension_reduction}{If TRUE, dimension reduction will be applied.  In this case,
+permutation vims will be calculated.}
+
+\item{MAST_pval}{matrix of pvalues sizes from MAST.}
+
+\item{pval_threshold}{threshold for pvalues for screening covariates based on marginal
+effect sizes.}
+
+\item{MAST_fc}{matrix of effect sizes from MAST.}
+
+\item{fc_threshold}{threshold for effect sizes for screening covariates based on marginal
+effect sizes.}
+
+\item{pca_genes}{genes used pca}
+
+\item{inputTF}{input transcription factors}
 }
 \value{
 A list.

@@ -9,9 +9,12 @@ Maintainer: Daniel Conn <djconn17@gmail.com>
 Depends: R (>= 3.5.0)
 Imports:
     randomForest,
+    ranger,
     stats,
     cvTools,
-    PRROC
+    corpcor,
+    PRROC,
+    MultivariateRandomForest
 Suggests:
     mpath
 Description: This package uses a new random forest based method

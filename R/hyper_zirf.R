@@ -123,14 +123,16 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
   zilm_dat <- data.frame(x, z, y)
   names(zilm_dat)[dim(zilm_dat)[2]] <- yname
   #initial estimate of count model
-  pois_mod <- mpath::cv.zipath(mod_formula, data = zilm_dat,  nlambda=nlambda,
-                               penalty.factor.zero=0,
-                               family="poisson",
-                               plot.it = F)
-  ##apply initial E-step to get initial probabilities of inclusion
-  pois_coef <- stats::coef(pois_mod)
-  zero_coef <- pois_coef$zero
-  count_coef <- pois_coef$count
+  if(is.null(count_coef) & is.null(zero_coef)){
+    pois_mod <- mpath::cv.zipath(mod_formula, data = zilm_dat,  nlambda=nlambda,
+                                 penalty.factor.zero=0,
+                                 family="poisson",
+                                 plot.it = F)
+    ##apply initial E-step to get initial probabilities of inclusion
+    pois_coef <- stats::coef(pois_mod)
+    zero_coef <- pois_coef$zero
+    count_coef <- pois_coef$count
+  }
   #this is just for simulations; must delete when done with testing.
   #what happens if we use the right values for linear cuts
   #count_coef <-  c(-1, 1, .5, rep(0, 20 - 3))

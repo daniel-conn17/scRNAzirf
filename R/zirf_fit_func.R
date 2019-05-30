@@ -86,7 +86,6 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   #ptm <- proc.time()
   names(quick_zilm_dat)[dim(quick_zilm_dat)[2]] <- "y"
   if(is.null(count_coef)){
-
     pois_mod <- mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
                           penalty.factor.zero=0,
                           family="poisson",

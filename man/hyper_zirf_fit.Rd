@@ -6,11 +6,11 @@
 tuning parameters.}
 \usage{
 hyper_zirf_fit(x, z, y, rounds, mtry, ntree = 100, nodesize = 5,
-  perm_frac = 0.75, count_coef = NULL, zero_coef = NULL,
+  perm_frac = 0.15, count_coef = NULL, zero_coef = NULL,
   newx = NULL, newz = NULL, iter_keep_pi = F, iter_keep_preds = F,
   iter_keep_xsi = F, nlambda = 10, dimension_reduction = T,
-  MAST_pval = NULL, pval_threshold = NULL, MAST_fc = NULL,
-  fc_threshold = NULL, pca_genes = NULL, inputTF = NULL)
+  mtry_factor = 1, pvals = NULL, log_fcs = NULL,
+  pval_threshold = NULL, log_fc_threshold = NULL)
 }
 \arguments{
 \item{x}{Matrix or data.frame of covariates for the count part
@@ -52,19 +52,17 @@ are kept across EM iterations}
 \item{dimension_reduction}{If TRUE, dimension reduction will be applied.  In this case,
 permutation vims will be calculated.}
 
-\item{MAST_pval}{matrix of pvalues sizes from MAST.}
+\item{mtry_factor}{multiplier of mtry used when dimension_reduction=T.  mtry is set to
+the number of screened variables times mtry_factor.}
+
+\item{pvals}{vector of pvalues sizes}
+
+\item{log_fcs}{vector of log-fold changes}
 
 \item{pval_threshold}{threshold for pvalues for screening covariates based on marginal
 effect sizes.}
 
-\item{MAST_fc}{matrix of effect sizes from MAST.}
-
-\item{fc_threshold}{threshold for effect sizes for screening covariates based on marginal
-effect sizes.}
-
-\item{pca_genes}{genes used pca}
-
-\item{inputTF}{input transcription factors}
+\item{log_fc_threshold}{threshold for log fold-changes}
 }
 \value{
 A list.

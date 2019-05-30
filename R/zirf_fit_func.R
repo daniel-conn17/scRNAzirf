@@ -91,6 +91,9 @@ zirf_fit <- function(x, z, y, rounds, mtry,
                           penalty.factor.zero=0,
                           family="poisson",
                           plot.it = F)
+
+#    pois_mod <- pscl::zeroinfl(mod_formula, data = quick_zilm_dat,
+#                               dist="poisson")
     #print(proc.time() - ptm)
     pois_mod$fit$theta[pois_mod$lambda.which]
 

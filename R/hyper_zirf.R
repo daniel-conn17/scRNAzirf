@@ -147,6 +147,7 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
   linear_cut <- x_mat_int%*%count_coef
   log_init_pois <- linear_cut
   z_mat_int <- as.matrix(cbind(rep(1, nrow(z)), z))
+  zero_coef0 <- zero_coef
   logit_pi <- z_mat_int%*%zero_coef
 
   x <- x[, cov_keep, drop=F]
@@ -189,50 +190,122 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
   keep_xsi <- matrix(NA, nrow=rounds, ncol=length(zero_coef))
   #create data.frame that will be used for ranger fit
   ranger_dat <- data.frame(y, x)
-  for(i in 1:rounds){
-    inbag_arg <- vector("list", length=ntree)
-    for(k in 1:ntree){
-      inbag_arg[[k]] <- stats::rbinom(n, 1, 1 - probi)
+
+
+
+    tree_preds <- matrix(NA, nrow=dim(x)[1], ncol=ntree)
+    newdat_tree_preds <- matrix(NA, nrow=dim(newx)[1], ncol=ntree)
+    for(i in 1:rounds){
+      #rf_list <- vector("list", length=ntree)
+      if(i == rounds){
+        importance_measures <- matrix(NA, dim(x)[2], ntree)
+      }
+      for(j in 1:ntree){
+        #first generate values of Z for each individual
+        czi <- stats::rbinom(n, 1, probi)
+        cz0 <- which(czi == 0)
+        cx <- x[cz0, , drop=F]
+        cy <- y[cz0]
+        cdat <- data.frame(cy=cy, cx)
+        rf_fit <- randomForest::randomForest(cx, cy, mtry=mtry, ntree=1,
+                                             nodesize=nodesize)
+        if(i == rounds){
+          newdat_tree_preds[, j] <- stats::predict(rf_fit, newdata=newx)
+          importance_measures[, j] <- randomForest::importance(rf_fit, type=2)
+        } else {
+          tree_preds[, j] <- stats::predict(rf_fit, newdata=x)
+        }
+      }
+      #print(proc.time() - ptm)
+      #we have predictions e.g. estimated values of \lambda_{i}
+      #we now update the coefficients xsi
+      rf_preds_z0 <- rowSums(tree_preds)/ntree
+      mui <- rf_preds_z0
+      mui <- round(mui, 12)
+      if(sum(is.na(probi)) > 0){browser()}
+      if(sum(is.nan(probi)) > 0){browser()}
+      if(any(probi < 0 | probi > 1)){browser()}
+      model_zero <- suppressWarnings(stats::glm.fit(z_mat_int, probi,
+                              family = stats::binomial(link = "logit"),
+                              start = zero_coef,
+                              control=list(maxit=1000)))
+      zero_coef <-  stats::coef(model_zero)
+      zero_coef0 <- zero_coef
+      logit_pi <- z_mat_int%*%zero_coef
+      probi <- expit(logit_pi)
+      probi <- probi/(probi + (1 - probi)*stats::dpois(0, mui))
+      probi[y1] <- 0
+      if(sum(is.na(probi)) > 0){browser()}
+      if(sum(is.nan(probi)) > 0){browser()}
+      if(any(probi < 0 | probi > 1)){browser()}
+      if(iter_keep_pi){
+        keep_pi[i, ] <- probi
+      }
+      if(iter_keep_preds){
+        keep_preds[i, ] <- mui
+      }
+      if(iter_keep_xsi){
+        keep_xsi[i, ] <- zero_coef
+      }
     }
-    rf_fit <- ranger::ranger(y ~ ., data=ranger_dat, mtry=mtry,
-                             write.forest = T, importance="none",
-                             num.trees = ntree, inbag=inbag_arg)
-    rf_preds_z0 <- stats::predict(rf_fit, data=x)$predictions
-    if(i == rounds){
-      new_rf_preds_z0 <- stats::predict(rf_fit, data=newx)$predictions
-    }
-    mui <- rf_preds_z0
-    mui <- round(mui, 12)
-    model_zero <- suppressWarnings(stats::glm.fit(z_mat_int, probi,
-                                                  family = stats::binomial(link = "logit"),
-                                                  start = zero_coef,
-                                                  control=list(maxit=1000)))
-    zero_coef <-  stats::coef(model_zero)
-    logit_pi <- z_mat_int%*%zero_coef
-    probi <- expit(logit_pi)
-    probi <- probi/(probi + (1 - probi)*stats::dpois(0, mui))
-    probi[y1] <- 0
-    if(iter_keep_pi){
-      keep_pi[i, ] <- probi
-    }
-    if(iter_keep_preds){
-      keep_preds[i, ] <- mui
-    }
-    if(iter_keep_xsi){
-      keep_xsi[i, ] <- zero_coef
-    }
-  }
   new_log_struc_zero <- newz%*%zero_coef
+  new_rf_preds_z0 <- rowSums(newdat_tree_preds)/ntree
   new_probi <- 1/(1 + exp(-new_log_struc_zero))
+
+  #for(i in 1:rounds){
+  #  inbag_arg <- vector("list", length=ntree)
+  #  for(k in 1:ntree){
+  #    inbag_arg[[k]] <- stats::rbinom(n, 1, 1 - probi)
+  #  }
+  #  rf_fit <- ranger::ranger(y ~ ., data=ranger_dat, mtry=mtry,
+  #                           write.forest = T, importance="none",
+  #                           num.trees = ntree, inbag=inbag_arg)
+  #  rf_preds_z0 <- stats::predict(rf_fit, data=x)$predictions
+  #  if(i == rounds){
+  #    new_rf_preds_z0 <- stats::predict(rf_fit, data=newx)$predictions
+  #  }
+  #  mui <- rf_preds_z0
+  #  mui <- round(mui, 12)
+  #  model_zero <- suppressWarnings(stats::glm.fit(z_mat_int, probi,
+  #                                                family = stats::binomial(link = "logit"),
+  #                                                start = zero_coef,
+  #                                                control=list(maxit=1000)))
+  #  zero_coef <-  stats::coef(model_zero)
+  #  logit_pi <- z_mat_int%*%zero_coef
+  #  probi <- expit(logit_pi)
+  #  probi <- probi/(probi + (1 - probi)*stats::dpois(0, mui))
+  #  probi[y1] <- 0
+  #  if(iter_keep_pi){
+  #    keep_pi[i, ] <- probi
+  #  }
+  #  if(iter_keep_preds){
+  #    keep_preds[i, ] <- mui
+  #  }
+  #  if(iter_keep_xsi){
+  #    keep_xsi[i, ] <- zero_coef
+  #  }
+  #}
+  #new_log_struc_zero <- newz%*%zero_coef
+  #new_probi <- 1/(1 + exp(-new_log_struc_zero))
+
+  new_prob_zero <- 1 - (new_probi + (1 - new_probi)*exp(-new_rf_preds_z0))
+  new_prob_zero <- new_prob_zero[, 1]
   new_fit <- data.frame(lambda_preds=new_rf_preds_z0,
                         count_preds=new_rf_preds_z0*(1 - new_probi),
-                        unconditional_pi=new_probi)
+                        unconditional_pi=new_probi,
+                        prob_zero = new_prob_zero)
 
+  #conditional probi is the probability a structural zero given that y=0
+  #unconditiona probi is the probability that we have a zero count given
+  #the covariates
   unconditional_probi <- 1/(1 + exp(-logit_pi))
-  data_fit <- data.frame(lambda_preds=rf_preds_z0,
-                         count_preds=rf_preds_z0*(1 - unconditional_probi),
-                         fitted_pi=probi,
-                         unconditional_pi=unconditional_probi)
+  prob_zero <- 1 - (unconditional_probi + (1 - unconditional_probi)*exp(-rf_preds_z0))
+  prob_zero <- prob_zero[, 1]
+  data_fit <- data.frame(lambda_preds = rf_preds_z0,
+                         count_preds = rf_preds_z0*(1 - unconditional_probi),
+                         fitted_pi = probi,
+                         unconditional_pi = unconditional_probi,
+                         prob_zero = prob_zero)
   if(!iter_keep_preds){
     keep_preds = NULL
   }
@@ -240,52 +313,53 @@ hyper_zirf_fit <- function(x, z, y, rounds, mtry,
     keep_pi = NULL
   }
 
-  #now compute permutation variable importance measures
-  df_mult <- function(x, coef, return_mat=T){
-    out <- as.matrix(cbind(rep(1, dim(x)[1]), x))%*%coef
-    if(!return_mat){
-      out <- out[, 1]
-    }
-    out
-  }
-  m <- 2000
-  xperm_perturb <- apply(xperm, 2,
-                         function(x){sample(x, m, replace=T)})
-  xperm <- xperm[sample(1:dim(xperm)[1], m, replace = T), ]
-  xperm_linear_cut <- df_mult(xperm, count_coef_full)
-  #xperm_PCs <- as.matrix(xperm[, pca_genes])%*%PCs
-  xperm_PCs <- as.matrix(xperm)%*%PCs
-  colnames(xperm_PCs) <- c("PC1", "PC2")
-  vim_ests <- rep(NA, dim(xperm)[2])
-  for(l in 1:dim(xperm)[2]){
-    perturbed_covariate <- xperm
-    perturbed_covariate[, l] <- xperm_perturb[, l]
-    perturbed_covariate_linear_cut <- df_mult(perturbed_covariate[, names(count_coef_full[-1])],
-                                              count_coef_full, return_mat = FALSE)
-    #form PCs for perturbed covariate
-    #perturbed_PCs <- as.matrix(perturbed_covariate[, pca_genes])%*%PCs
-    perturbed_PCs <- as.matrix(perturbed_covariate)%*%PCs
-    colnames(perturbed_PCs) <- c("PC1", "PC2")
-    ranger_perturbed <- perturbed_covariate[, cov_keep, drop=F]
-    ranger_perturbed <- data.frame(ranger_perturbed,
-                                   perturbed_PCs,
-                                   linear_cut=perturbed_covariate_linear_cut)
-    #ranger_perturbed <- data.frame(perturbed_PCs,
-    #                               linear_cut=perturbed_covariate_linear_cut)
+  ##now compute permutation variable importance measures
+  #df_mult <- function(x, coef, return_mat=T){
+  #  out <- as.matrix(cbind(rep(1, dim(x)[1]), x))%*%coef
+  #  if(!return_mat){
+  #    out <- out[, 1]
+  #  }
+  #  out
+  #}
+  #m <- 2000
+  #xperm_perturb <- apply(xperm, 2,
+  #                       function(x){sample(x, m, replace=T)})
+  #xperm <- xperm[sample(1:dim(xperm)[1], m, replace = T), ]
+  #xperm_linear_cut <- df_mult(xperm, count_coef_full)
+  ##xperm_PCs <- as.matrix(xperm[, pca_genes])%*%PCs
+  #xperm_PCs <- as.matrix(xperm)%*%PCs
+  #colnames(xperm_PCs) <- c("PC1", "PC2")
+  #vim_ests <- rep(NA, dim(xperm)[2])
+  #for(l in 1:dim(xperm)[2]){
+  #  perturbed_covariate <- xperm
+  #  perturbed_covariate[, l] <- xperm_perturb[, l]
+  #  perturbed_covariate_linear_cut <- df_mult(perturbed_covariate[, names(count_coef_full[-1])],
+  #                                            count_coef_full, return_mat = FALSE)
+  #  #form PCs for perturbed covariate
+  #  #perturbed_PCs <- as.matrix(perturbed_covariate[, pca_genes])%*%PCs
+  #  perturbed_PCs <- as.matrix(perturbed_covariate)%*%PCs
+  #  colnames(perturbed_PCs) <- c("PC1", "PC2")
+  #  ranger_perturbed <- perturbed_covariate[, cov_keep, drop=F]
+  #  ranger_perturbed <- data.frame(ranger_perturbed,
+  #                                 perturbed_PCs,
+  #                                 linear_cut=perturbed_covariate_linear_cut)
+  #  #ranger_perturbed <- data.frame(perturbed_PCs,
+  #  #                               linear_cut=perturbed_covariate_linear_cut)
+  #
+  #  ranger_perm <- xperm[, cov_keep, drop=F]
+  #  ranger_perm <- data.frame(ranger_perm,
+  #                            xperm_PCs,
+  #                            linear_cut=xperm_linear_cut)
+  #  #ranger_perm <- data.frame(xperm_PCs,
+  #  #                          linear_cut=xperm_linear_cut)
+  #
+  #  perturbed_fit <- stats::predict(rf_fit, data=ranger_perturbed)$predictions
+  #  vim_fit <- stats::predict(rf_fit, data=ranger_perm)$predictions
+  #  vim_ests[l] <- mean((perturbed_fit - vim_fit)^2)
+  #}
 
-    ranger_perm <- xperm[, cov_keep, drop=F]
-    ranger_perm <- data.frame(ranger_perm,
-                              xperm_PCs,
-                              linear_cut=xperm_linear_cut)
-    #ranger_perm <- data.frame(xperm_PCs,
-    #                          linear_cut=xperm_linear_cut)
-
-    perturbed_fit <- stats::predict(rf_fit, data=ranger_perturbed)$predictions
-    vim_fit <- stats::predict(rf_fit, data=ranger_perm)$predictions
-    vim_ests[l] <- mean((perturbed_fit - vim_fit)^2)
-  }
   out <- list(new_fit=new_fit, data_fit=data_fit,
-              importance_measures=vim_ests,
+              importance_measures=NULL,
               zero_coef=zero_coef,
               iter_keep_preds=keep_preds,
               iter_keep_pi=keep_pi,

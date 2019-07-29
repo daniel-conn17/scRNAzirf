@@ -36,8 +36,6 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   nb_part01 <- paste("y", "~ ", collapse="")
   if(class(x) == "data.frame"){
     x_names <- names(x)
-    names(x) <- paste("chr_", names(x), sep="")
-    names(x) <- gsub("\\.", "_", names(x))
     nb_part02 <- paste(names(x), collapse="+")
     zero_part <- paste0("|", paste0(names(z), collapse="+"))
     if(!is.null(newx)){
@@ -46,8 +44,6 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   }
   if(class(x) == "matrix"){
     x_names <- colnames(x)
-    colnames(x) <- paste("chr_", colnames(x), sep="")
-    colnames(x) <- gsub("-", "_", colnames(x))
     nb_part02 <- paste(colnames(x), collapse=" + ")
     zero_part <- paste0("|", paste0(colnames(z), collapse=" + "))
     if(!is.null(newx)){
@@ -58,13 +54,9 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   mod_formula <- stats::as.formula(mod_string)
   if(class(y) == "data.frame"){
     y_names <- names(y)
-    names(y) <- paste("chr_", names(y), sep="")
-    names(y) <- gsub("\\.", "_", names(y))
   }
   if(class(y) == "matrix"){
     y_names <- colnames(y)
-    colnames(y) <- paste("chr_", colnames(y), sep="")
-    colnames(y) <- gsub("\\.", "_", colnames(y))
   }
   zilm_dat <- data.frame(x, z, y=y)
   if(is.null(newx)){
@@ -181,15 +173,22 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   new_log_struc_zero <- newz%*%zero_coef
   new_rf_preds_z0 <- rowSums(newdat_tree_preds)/ntree
   new_probi <- 1/(1 + exp(-new_log_struc_zero))
+  new_prob_zero <- 1 - (new_probi + (1 - new_probi)*exp(-new_rf_preds_z0))
   new_fit <- data.frame(lambda_preds=new_rf_preds_z0,
                         count_preds=new_rf_preds_z0*(1 - new_probi),
-                        unconditional_pi=new_probi)
+                        unconditional_pi=new_probi,
+                        prob_zero = new_prob_zero)
 
+  #conditional probi is the probability a structural zero given that y=0
+  #unconditiona probi is the probability that we have a zero count given
+  #the covariates
   unconditional_probi <- 1/(1 + exp(-logit_pi))
+  prob_zero <- 1 - (unconditional_probi + (1 - unconditional_probi)*exp(-rf_preds_z0))
   data_fit <- data.frame(lambda_preds=rf_preds_z0,
                          count_preds=rf_preds_z0*(1 - unconditional_probi),
                          fitted_pi=probi,
-                         unconditional_pi=unconditional_probi)
+                         unconditional_pi=unconditional_probi,
+                         prob_zero = prob_zero)
   importance_measures <- rowMeans(importance_measures)
   #should prob return variable importance measures eventually
   if(!iter_keep_preds){

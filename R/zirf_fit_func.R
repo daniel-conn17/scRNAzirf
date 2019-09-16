@@ -12,8 +12,8 @@
 #' @param nodesize  controls depth of regression trees
 #' @param count_coef values for initial estimate of count model.
 #' @param zero_coef values for initial estimate of zero-inflation model.
-#' @param newx count model covariate matrix for new data.
-#' @param newz zero inflation model covariate matrix for new data.
+#' @param newx A list of count model covariate matrices for new data.
+#' @param newz A list of zero inflation model covariate matrices for new data.
 #' @param iter_keep_pi boolean, if TRUE values of pi are kept across EM iterations
 #' @param iter_keep_preds boolean, if TRUE prediction values are kept across EM iterations
 #' @param iter_keep_xsi boolean, if TRUE zero-inflation model coefficients
@@ -27,6 +27,14 @@ zirf_fit <- function(x, z, y, rounds, mtry,
                      newx=NULL, newz=NULL,
                      iter_keep_pi=F, iter_keep_preds=F,
                      iter_keep_xsi=F, nlambda=10){
+  if(class(newx) == "data.frame" |
+     class(newx) == "matrix"){
+    newx = list(newx)
+  }
+  if(class(newz) == "data.frame" |
+     class(newz) == "matrix"){
+    newz = list(newz)
+  }
   #add a character to start of every variable so that we don't run into other issues
   # to get the original names run the following command:
   # substring(names(zilm_dat), 5)
@@ -39,7 +47,9 @@ zirf_fit <- function(x, z, y, rounds, mtry,
     nb_part02 <- paste(names(x), collapse="+")
     zero_part <- paste0("|", paste0(names(z), collapse="+"))
     if(!is.null(newx)){
-      names(newx) <- names(x)
+      for(i in 1:length(newx)){
+        names(newx[[i]]) <- names(x)
+      }
     }
   }
   if(class(x) == "matrix"){
@@ -47,7 +57,9 @@ zirf_fit <- function(x, z, y, rounds, mtry,
     nb_part02 <- paste(colnames(x), collapse=" + ")
     zero_part <- paste0("|", paste0(colnames(z), collapse=" + "))
     if(!is.null(newx)){
-      colnames(newx) <- colnames(x)
+      for(i in 1:length(newx)){
+        colnames(newx[[i]]) <- colnames(x)
+      }
     }
   }
   mod_string <- paste(nb_part01, nb_part02, zero_part, sep="")
@@ -63,11 +75,15 @@ zirf_fit <- function(x, z, y, rounds, mtry,
     newx <- as.data.frame(x)
     newz <- as.matrix(z)
     newz <- as.matrix(cbind(rep(1, nrow(newz)), newz))
+    newx <- list(newx)
+    newz <- list(newz)
   }
   else {
-    newx <- as.data.frame(newx)
-    newz <- as.matrix(newz)
-    newz <- as.matrix(cbind(rep(1, nrow(newz)), newz))
+    for(i in 1:length(newx)){
+      newx[[i]] <- as.data.frame(newx[[i]])
+      newz[[i]] <- as.matrix(newz[[i]])
+      newz[[i]] <- as.matrix(cbind(rep(1, nrow(newz[[i]])), newz[[i]]))
+    }
   }
   #fit initial zip model, comment out the next line, if desired
   #normally this should be set to 100-3000
@@ -78,20 +94,30 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   #ptm <- proc.time()
   names(quick_zilm_dat)[dim(quick_zilm_dat)[2]] <- "y"
   if(is.null(count_coef)){
-    pois_mod <- mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
-                          penalty.factor.zero=0,
-                          family="poisson",
-                          plot.it = F)
-
-#    pois_mod <- pscl::zeroinfl(mod_formula, data = quick_zilm_dat,
-#                               dist="poisson")
-    #print(proc.time() - ptm)
-    pois_mod$fit$theta[pois_mod$lambda.which]
-
-    #apply initial E-step to get initial probabilities of inclusion
-    pois_coef <- stats::coef(pois_mod)
-    zero_coef <- pois_coef$zero
-    count_coef <- pois_coef$count
+    #pois_mod <- mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
+    #                      #penalty.factor.zero=0,
+    #                      family="poisson",
+    #                      plot.it = F)
+    pois_mod <-  tryCatch({pscl::zeroinfl(mod_formula, data = quick_zilm_dat,
+                                 dist="poisson")},
+                          error = function(err){
+                            print(err)
+                            out <- "error"
+                            })
+    if(class(pois_mod) == "zeroinfl"){
+      #pois_mod$fit$theta[pois_mod$lambda.which]
+      #apply initial E-step to get initial probabilities of inclusion
+      #pois_coef <- stats::coef(pois_mod)
+      #zero_coef <- pois_coef$zero
+      #count_coef <- pois_coef$count
+      count_coef <- pois_mod$coefficients$count
+      zero_coef <- pois_mod$coefficients$zero
+    } else {
+      mean_y <- mean(y)
+      zero_prop <- sum(y == 0)/length(y)
+      zero_coef <- c(log(zero_prop/(1 - zero_prop)), rep(0, dim(z)[2]))
+      count_coef <- c(exp(mean_y), rep(0, dim(x)[2]))
+    }
   }
   zdat <- zilm_dat[, z_ind, drop=F]
   zdat <- as.matrix(cbind(rep(1, nrow(zdat)), zdat))
@@ -114,7 +140,10 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   n <- dim(x)[1]
   #ptm <- proc.time()
   tree_preds <- matrix(NA, nrow=dim(xdat_df)[1], ncol=ntree)
-  newdat_tree_preds <- matrix(NA, nrow=dim(newx)[1], ncol=ntree)
+  newdat_tree_preds <- vector("list", length(newx))
+  for(i in 1:length(newx)){
+    newdat_tree_preds[[i]] <- matrix(NA, nrow=dim(newx[[i]])[1], ncol=ntree)
+  }
   keep_preds <- matrix(NA, nrow=rounds, ncol=dim(xdat_df)[1])
   keep_pi <- matrix(NA, nrow=rounds, ncol=dim(xdat_df)[1])
   keep_xsi <- matrix(NA, nrow=rounds, ncol=length(zero_coef))
@@ -133,8 +162,10 @@ zirf_fit <- function(x, z, y, rounds, mtry,
         rf_fit <- randomForest::randomForest(cx, cy, mtry=mtry, ntree=1,
                                              nodesize=nodesize)
         if(i == rounds){
-          newdat_tree_preds[, j] <- stats::predict(rf_fit, newdata=newx)
           importance_measures[, j] <- randomForest::importance(rf_fit, type=2)
+          for(rr in 1:length(newx)){
+            newdat_tree_preds[[rr]][, j] <- stats::predict(rf_fit, newdata=newx[[rr]])
+          }
         } else {
           tree_preds[, j] <- stats::predict(rf_fit, newdata=xdat_df)
         }
@@ -169,16 +200,22 @@ zirf_fit <- function(x, z, y, rounds, mtry,
       if(iter_keep_xsi){
         keep_xsi[i, ] <- zero_coef
       }
-    }
-  new_log_struc_zero <- newz%*%zero_coef
-  new_rf_preds_z0 <- rowSums(newdat_tree_preds)/ntree
-  new_probi <- 1/(1 + exp(-new_log_struc_zero))
-  new_prob_zero <- 1 - (new_probi + (1 - new_probi)*exp(-new_rf_preds_z0))
-  new_fit <- data.frame(lambda_preds=new_rf_preds_z0,
-                        count_preds=new_rf_preds_z0*(1 - new_probi),
-                        unconditional_pi=new_probi,
-                        prob_zero = new_prob_zero)
+  }
 
+  new_fit <- vector("list", length(newx))
+  for(i in 1:length(newx)){
+    new_log_struc_zero <- newz[[i]]%*%zero_coef
+    new_rf_preds_z0 <- rowSums(newdat_tree_preds[[i]])/ntree
+    new_probi <- 1/(1 + exp(-new_log_struc_zero))
+    new_prob_zero <- 1 - (new_probi + (1 - new_probi)*exp(-new_rf_preds_z0))
+    new_fit[[i]] <- data.frame(lambda_preds=new_rf_preds_z0,
+                          count_preds=new_rf_preds_z0*(1 - new_probi),
+                          unconditional_pi=new_probi,
+                          prob_zero = new_prob_zero)
+  }
+  if(length(new_fit) == 1){
+    new_fit <- new_fit[[1]]
+  }
   #conditional probi is the probability a structural zero given that y=0
   #unconditiona probi is the probability that we have a zero count given
   #the covariates
@@ -203,4 +240,6 @@ zirf_fit <- function(x, z, y, rounds, mtry,
               iter_keep_preds=keep_preds,
               iter_keep_pi=keep_pi,
               iter_keep_xsi=keep_xsi)
+  class(out) <- "zirf_fit"
+  out
 }

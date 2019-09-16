@@ -4,3 +4,4 @@
 .Ruserdata
 vim_metric_test/
 man/
+.DS_Store

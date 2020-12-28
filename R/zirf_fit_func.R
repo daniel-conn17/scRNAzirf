@@ -19,6 +19,7 @@
 #' @param iter_keep_xsi boolean, if TRUE zero-inflation model coefficients
 #'                      are kept across EM iterations
 #' @param nlambda number of folds of cross-validation
+#' @param threshold_prob number of folds of cross-validation
 #' @return A list.
 #' @export
 zirf_fit <- function(x, z, y, rounds, mtry,
@@ -26,7 +27,8 @@ zirf_fit <- function(x, z, y, rounds, mtry,
                      count_coef=NULL, zero_coef=NULL,
                      newx=NULL, newz=NULL,
                      iter_keep_pi=F, iter_keep_preds=F,
-                     iter_keep_xsi=F, nlambda=10){
+                     iter_keep_xsi=F, nlambda=10,
+                     threshold_prob = F){
   if(class(newx) == "data.frame" |
      class(newx) == "matrix"){
     newx = list(newx)
@@ -94,24 +96,28 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   #ptm <- proc.time()
   names(quick_zilm_dat)[dim(quick_zilm_dat)[2]] <- "y"
   if(is.null(count_coef)){
-    #pois_mod <- mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
-    #                      #penalty.factor.zero=0,
-    #                      family="poisson",
-    #                      plot.it = F)
-    pois_mod <-  tryCatch({pscl::zeroinfl(mod_formula, data = quick_zilm_dat,
-                                 dist="poisson")},
-                          error = function(err){
-                            print(err)
-                            out <- "error"
-                            })
-    if(class(pois_mod) == "zeroinfl"){
+    pois_mod <- tryCatch({mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
+                          #penalty.factor.zero=0,
+                          family="poisson",
+                          plot.it = F)},
+                         error = function(err) {
+                           print(err)
+                           out <- "error"
+                         })
+    #pois_mod <-  tryCatch({pscl::zeroinfl(mod_formula, data = quick_zilm_dat,
+    #                             dist="poisson")},
+    #                      error = function(err){
+    #                        print(err)
+    #                        out <- "error"
+    #                        })
+    if(class(pois_mod) == "cv.zipath"){
       #pois_mod$fit$theta[pois_mod$lambda.which]
       #apply initial E-step to get initial probabilities of inclusion
-      #pois_coef <- stats::coef(pois_mod)
-      #zero_coef <- pois_coef$zero
-      #count_coef <- pois_coef$count
-      count_coef <- pois_mod$coefficients$count
-      zero_coef <- pois_mod$coefficients$zero
+      pois_coef <- stats::coef(pois_mod)
+      zero_coef <- pois_coef$zero
+      count_coef <- pois_coef$count
+      #count_coef <- pois_mod$coefficients$count
+      #zero_coef <- pois_mod$coefficients$zero
     } else {
       mean_y <- mean(y)
       zero_prop <- sum(y == 0)/length(y)
@@ -153,9 +159,15 @@ zirf_fit <- function(x, z, y, rounds, mtry,
         importance_measures <- matrix(NA, dim(x)[2], ntree)
       }
       for(j in 1:ntree){
-        #first generate values of Z for each individual
-        czi <- stats::rbinom(n, 1, probi)
-        cz0 <- which(czi == 0)
+        if(!threshold_prob){
+          #generate values of Z for each individual
+          czi <- stats::rbinom(n, 1, probi)
+          cz0 <- czi == 0
+        }
+        if(threshold_prob){
+          #generate values of Z for each individual
+          cz0 <- probi < .5
+        }
         cx <- x[cz0, , drop=F]
         cy <- y[cz0]
         cdat <- data.frame(cy=cy, cx)
@@ -227,7 +239,12 @@ zirf_fit <- function(x, z, y, rounds, mtry,
                          unconditional_pi=unconditional_probi,
                          prob_zero = prob_zero)
   importance_measures <- rowMeans(importance_measures)
-  #should prob return variable importance measures eventually
+  if(is.data.frame(x)) {
+    imp_names <- names(x)
+  } else {
+    imp_names <- colnames(x)
+  }
+  names(importance_measures) <- imp_names
   if(!iter_keep_preds){
     keep_preds = NULL
   }

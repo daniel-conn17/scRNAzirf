@@ -5,10 +5,24 @@
 \title{Fit zero-inflated random forests given a pre-specified set of
 tuning parameters.}
 \usage{
-zirf_fit(x, z, y, rounds, mtry, ntree = 100, nodesize = 5,
-  count_coef = NULL, zero_coef = NULL, newx = NULL, newz = NULL,
-  iter_keep_pi = F, iter_keep_preds = F, iter_keep_xsi = F,
-  nlambda = 10)
+zirf_fit(
+  x,
+  z,
+  y,
+  rounds,
+  mtry,
+  ntree = 100,
+  nodesize = 5,
+  count_coef = NULL,
+  zero_coef = NULL,
+  newx = NULL,
+  newz = NULL,
+  iter_keep_pi = F,
+  iter_keep_preds = F,
+  iter_keep_xsi = F,
+  nlambda = 10,
+  threshold_prob = F
+)
 }
 \arguments{
 \item{x}{Matrix or data.frame of covariates for the count part
@@ -31,9 +45,9 @@ part of the model.}
 
 \item{zero_coef}{values for initial estimate of zero-inflation model.}
 
-\item{newx}{count model covariate matrix for new data.}
+\item{newx}{A list of count model covariate matrices for new data.}
 
-\item{newz}{zero inflation model covariate matrix for new data.}
+\item{newz}{A list of zero inflation model covariate matrices for new data.}
 
 \item{iter_keep_pi}{boolean, if TRUE values of pi are kept across EM iterations}
 
@@ -43,6 +57,8 @@ part of the model.}
 are kept across EM iterations}
 
 \item{nlambda}{number of folds of cross-validation}
+
+\item{threshold_prob}{number of folds of cross-validation}
 }
 \value{
 A list.

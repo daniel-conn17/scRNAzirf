@@ -22,20 +22,21 @@
 #' @param threshold_prob number of folds of cross-validation
 #' @return A list.
 #' @export
-zirf_fit <- function(x, z, y, rounds, mtry,
+zirf_fit <- function(x, z, y, rounds = 25, mtry,
                      ntree=100, nodesize=5,
                      count_coef=NULL, zero_coef=NULL,
                      newx=NULL, newz=NULL,
-                     iter_keep_pi=F, iter_keep_preds=F,
-                     iter_keep_xsi=F, nlambda=10,
-                     threshold_prob = F){
+                     iter_keep_pi=T, iter_keep_preds=T,
+                     iter_keep_xsi=T, nlambda=10,
+                     threshold_prob = T){
+  #newx and newz are processed as lists of test sets. this just makes them a list
   if(class(newx) == "data.frame" |
      class(newx) == "matrix"){
-    newx = list(newx)
+     newx = list(newx)
   }
   if(class(newz) == "data.frame" |
      class(newz) == "matrix"){
-    newz = list(newz)
+     newz = list(newz)
   }
   #add a character to start of every variable so that we don't run into other issues
   # to get the original names run the following command:
@@ -46,6 +47,10 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   nb_part01 <- paste("y", "~ ", collapse="")
   if(class(x) == "data.frame"){
     x_names <- names(x)
+    #this is to deal withh the fact that some gene names start with numbers
+    #we are concatenating X to all of the gene names so that it is easier to
+    #undo this mild transformation of the gene names.
+    x_names <- paste0("X", x_names)
     nb_part02 <- paste(names(x), collapse="+")
     zero_part <- paste0("|", paste0(names(z), collapse="+"))
     if(!is.null(newx)){
@@ -56,6 +61,7 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   }
   if(class(x) == "matrix"){
     x_names <- colnames(x)
+    x_names <- paste0("X", x_names)
     nb_part02 <- paste(colnames(x), collapse=" + ")
     zero_part <- paste0("|", paste0(colnames(z), collapse=" + "))
     if(!is.null(newx)){
@@ -96,28 +102,18 @@ zirf_fit <- function(x, z, y, rounds, mtry,
   #ptm <- proc.time()
   names(quick_zilm_dat)[dim(quick_zilm_dat)[2]] <- "y"
   if(is.null(count_coef)){
-    pois_mod <- tryCatch({mpath::cv.zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
-                          #penalty.factor.zero=0,
+    pois_mod <- tryCatch({mpath::zipath(mod_formula, data = quick_zilm_dat,  nlambda=nlambda,
                           family="poisson",
                           plot.it = F)},
                          error = function(err) {
                            print(err)
                            out <- "error"
                          })
-    #pois_mod <-  tryCatch({pscl::zeroinfl(mod_formula, data = quick_zilm_dat,
-    #                             dist="poisson")},
-    #                      error = function(err){
-    #                        print(err)
-    #                        out <- "error"
-    #                        })
-    if(class(pois_mod) == "cv.zipath"){
-      #pois_mod$fit$theta[pois_mod$lambda.which]
-      #apply initial E-step to get initial probabilities of inclusion
+    if(class(pois_mod) == "zipath"){
+      best_ind <- which.min(pois_mod$bic)
       pois_coef <- stats::coef(pois_mod)
-      zero_coef <- pois_coef$zero
-      count_coef <- pois_coef$count
-      #count_coef <- pois_mod$coefficients$count
-      #zero_coef <- pois_mod$coefficients$zero
+      zero_coef <- pois_coef$zero[, best_ind]
+      count_coef <- pois_coef$count[, best_ind]
     } else {
       mean_y <- mean(y)
       zero_prop <- sum(y == 0)/length(y)

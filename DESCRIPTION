@@ -9,14 +9,10 @@ Maintainer: Daniel Conn <djconn17@gmail.com>
 Depends: R (>= 3.5.0)
 Imports:
     randomForest,
-    ranger,
     stats,
-    cvTools,
-    corpcor,
-    PRROC,
-    MultivariateRandomForest
-Suggests:
     mpath
+Suggests:
+    testthat (>= 3.0.0)
 Description: This package uses a new random forest based method
     to estimate the count parameters nonparametrically in 
     zero-inflated count models.  This package was developed
@@ -24,4 +20,5 @@ Description: This package uses a new random forest based method
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1
+Config/testthat/edition: 3

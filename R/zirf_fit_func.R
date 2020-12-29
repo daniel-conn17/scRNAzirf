@@ -30,6 +30,9 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
                      iter_keep_xsi=T, nlambda=10,
                      threshold_prob = T){
   #newx and newz are processed as lists of test sets. this just makes them a list
+  if(class(x) != class(z)) {
+    stop("class(x) must equal class(z)")
+  }
   if(class(newx) == "data.frame" |
      class(newx) == "matrix"){
      newx = list(newx)
@@ -46,13 +49,14 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
   z_ind <- (dim(x)[2] + 1):(dim(x)[2] + dim(z)[2])
   nb_part01 <- paste("y", "~ ", collapse="")
   if(class(x) == "data.frame"){
-    x_names <- names(x)
+    names(x) <- paste0("X", names(x))
     #this is to deal withh the fact that some gene names start with numbers
     #we are concatenating X to all of the gene names so that it is easier to
     #undo this mild transformation of the gene names.
-    x_names <- paste0("X", x_names)
-    nb_part02 <- paste(names(x), collapse="+")
-    zero_part <- paste0("|", paste0(names(z), collapse="+"))
+    x_names <- names(x)
+    nb_part02 <- paste(x_names, collapse="+")
+    z_names <- names(z)
+    zero_part <- paste0("|", paste0(z_names, collapse="+"))
     if(!is.null(newx)){
       for(i in 1:length(newx)){
         names(newx[[i]]) <- names(x)
@@ -60,10 +64,11 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
     }
   }
   if(class(x) == "matrix"){
+    colnames(x) <- paste0("X", colnames(x))
     x_names <- colnames(x)
-    x_names <- paste0("X", x_names)
-    nb_part02 <- paste(colnames(x), collapse=" + ")
-    zero_part <- paste0("|", paste0(colnames(z), collapse=" + "))
+    nb_part02 <- paste(x_names, collapse=" + ")
+    z_names <- colnames(z)
+    zero_part <- paste0("|", paste0(z_names, collapse=" + "))
     if(!is.null(newx)){
       for(i in 1:length(newx)){
         colnames(newx[[i]]) <- colnames(x)
@@ -241,6 +246,7 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
     imp_names <- colnames(x)
   }
   names(importance_measures) <- imp_names
+  names(importance_measures) <- gsub('^.', '', names(importance_measures))
   if(!iter_keep_preds){
     keep_preds = NULL
   }

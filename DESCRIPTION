@@ -9,10 +9,14 @@ Maintainer: Daniel Conn <djconn17@gmail.com>
 Depends: R (>= 3.5.0)
 Imports:
     randomForest,
+    GENIE3,
     stats,
     mpath
 Suggests:
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    SCENIC,
+    knitr,
+    rmarkdown
 Description: This package uses a new random forest based method
     to estimate the count parameters nonparametrically in 
     zero-inflated count models.  This package was developed
@@ -22,3 +26,4 @@ Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.1.1
 Config/testthat/edition: 3
+VignetteBuilder: knitr

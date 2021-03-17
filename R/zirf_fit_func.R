@@ -6,20 +6,24 @@
 #' @param z  Matrix or data.frame of covariates for the zero-inflation
 #'            part of the model.
 #' @param y  vector of count outcomes.
-#' @param rounds  how many iterations the EM algorithm should be run.
+#' @param rounds  how many iterations the EM algorithm should be run at maximum.
 #' @param mtry  which value of mtry to use in each forest.
-#' @param ntree  number of trees
-#' @param nodesize  controls depth of regression trees
+#' @param ntree  number of trees.
+#' @param nodesize  controls depth of regression trees.
 #' @param count_coef values for initial estimate of count model.
 #' @param zero_coef values for initial estimate of zero-inflation model.
 #' @param newx A list of count model covariate matrices for new data.
 #' @param newz A list of zero inflation model covariate matrices for new data.
-#' @param iter_keep_pi boolean, if TRUE values of pi are kept across EM iterations
-#' @param iter_keep_preds boolean, if TRUE prediction values are kept across EM iterations
+#' @param iter_keep_pi boolean, if TRUE values of pi are kept across EM iterations.
+#' @param iter_keep_preds boolean, if TRUE prediction values are kept across EM iterations.
 #' @param iter_keep_xsi boolean, if TRUE zero-inflation model coefficients
-#'                      are kept across EM iterations
-#' @param nlambda number of folds of cross-validation
-#' @param threshold_prob number of folds of cross-validation
+#'                      are kept across EM iterations.
+#' @param nlambda number of folds of cross-validation.
+#' @param threshold_prob boolean, if TRUE.
+#' @param epsilon tolerance used for stopping iterations.
+#'                 The maximum difference in probability of inclusion.
+#'                 between iterations is the criterion.
+
 #' @return A list.
 #' @export
 zirf_fit <- function(x, z, y, rounds = 25, mtry,
@@ -28,17 +32,15 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
                      newx=NULL, newz=NULL,
                      iter_keep_pi=T, iter_keep_preds=T,
                      iter_keep_xsi=T, nlambda=10,
-                     threshold_prob = T){
+                     threshold_prob = T, epsilon = .01){
   #newx and newz are processed as lists of test sets. this just makes them a list
-  if(class(x) != class(z)) {
+  if(!identical(class(x),class(z))) {
     stop("class(x) must equal class(z)")
   }
-  if(class(newx) == "data.frame" |
-     class(newx) == "matrix"){
+  if(is.data.frame(newx) | is.matrix(newx)){
      newx = list(newx)
   }
-  if(class(newz) == "data.frame" |
-     class(newz) == "matrix"){
+  if(is.data.frame(newz) | is.matrix(newz)){
      newz = list(newz)
   }
   #add a character to start of every variable so that we don't run into other issues
@@ -48,7 +50,7 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
   x_ind <- 1:dim(x)[2]
   z_ind <- (dim(x)[2] + 1):(dim(x)[2] + dim(z)[2])
   nb_part01 <- paste("y", "~ ", collapse="")
-  if(class(x) == "data.frame"){
+  if(is.data.frame(x)){
     names(x) <- paste0("X", names(x))
     #this is to deal withh the fact that some gene names start with numbers
     #we are concatenating X to all of the gene names so that it is easier to
@@ -63,7 +65,7 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
       }
     }
   }
-  if(class(x) == "matrix"){
+  if(is.matrix(x)){
     colnames(x) <- paste0("X", colnames(x))
     x_names <- colnames(x)
     nb_part02 <- paste(x_names, collapse=" + ")
@@ -77,12 +79,6 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
   }
   mod_string <- paste(nb_part01, nb_part02, zero_part, sep="")
   mod_formula <- stats::as.formula(mod_string)
-  if(class(y) == "data.frame"){
-    y_names <- names(y)
-  }
-  if(class(y) == "matrix"){
-    y_names <- colnames(y)
-  }
   zilm_dat <- data.frame(x, z, y=y)
   if(is.null(newx)){
     newx <- as.data.frame(x)
@@ -172,8 +168,8 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
         cx <- x[cz0, , drop=F]
         cy <- y[cz0]
         cdat <- data.frame(cy=cy, cx)
-        rf_fit <- randomForest::randomForest(cx, cy, mtry=mtry, ntree=1,
-                                             nodesize=nodesize)
+        rf_fit <- suppressWarnings(randomForest::randomForest(cx, cy, mtry=mtry, ntree=1,
+                                                              nodesize=nodesize))
         if(i == rounds){
           importance_measures[, j] <- randomForest::importance(rf_fit, type=2)
           for(rr in 1:length(newx)){
@@ -213,7 +209,16 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
       if(iter_keep_xsi){
         keep_xsi[i, ] <- zero_coef
       }
+      if(i > 1){
+
+        current_prob_diff <- max(abs(keep_pi[i, ] - keep_pi[i - 1, ]))
+        if(!is.logical(current_prob_diff < epsilon)){browser()}
+        if(current_prob_diff < epsilon){
+          converged = TRUE
+        }
+      }
   }
+  total_iters <- i - 1
 
   new_fit <- vector("list", length(newx))
   for(i in 1:length(newx)){
@@ -253,12 +258,16 @@ zirf_fit <- function(x, z, y, rounds = 25, mtry,
   if(!iter_keep_pi){
     keep_pi = NULL
   }
+  iter_keep_preds <- keep_preds[1:total_iters, ]
+  iter_keep_pi <- keep_pi[1:total_iters, ]
+  iter_keep_xsi <- keep_xsi[1:total_iters, ]
   out <- list(new_fit=new_fit, data_fit=data_fit,
               importance_measures=importance_measures,
               zero_coef=zero_coef,
               iter_keep_preds=keep_preds,
               iter_keep_pi=keep_pi,
-              iter_keep_xsi=keep_xsi)
+              iter_keep_xsi=keep_xsi,
+              iterations = total_iters)
   class(out) <- "zirf_fit"
   out
 }

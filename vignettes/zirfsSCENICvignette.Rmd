@@ -1,0 +1,95 @@
+---
+title: "Workflow for fitting SCENIC using ZIRFs-derived variable importance measures (VIMs)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{zirfsSCENICvignette}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+options(rmarkdown.html_vignette.check_title = FALSE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+We first need to load the required packages to run SCENIC with ZIRFs variable importance measures
+(VIMs). For guidance on downloading the requisite packages to use SCENIC see SCENIC's
+documentation on installation and set-up:
+https://github.com/aertslab/SCENIC/blob/master/vignettes/SCENIC_Setup.Rmd.
+```{r setup}
+suppressPackageStartupMessages({
+  library(scRNAzirf)
+  library(SCENIC)
+  library(foreach)
+})
+knitr::opts_knit$set(root.dir="zirfsSCENIC_vignette") 
+```
+
+We will go through a toy example using diaphragm cell data from the Tabula Muris Consortium
+(https://tabula-muris.ds.czbiohub.org/). During this vignette we will be downloading databases,
+creating intermediate files, and output files. We recommend creating new directories to keep
+these files organized.
+
+## Directories
+```{r dirsetup, eval = FALSE}
+#directory which we will be primarily working in
+dir.create("zirfsSCENIC_vignette")
+setwd("zirfsSCENIC_vignette")
+#directory where databases for motif scoring in SCENIC will be held
+dir.create("mousedb")
+```
+
+
+To run this example you'll need to download the following data sets which allow motifs to be 
+scored in SCENIC:
+dbFiles <- c("https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-500bp-upstream-7species.mc9nr.feather",
+"https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-tss-centered-10kb-7species.mc9nr.feather")
+These files can be downloaded using either curl or wget.
+For example using curl would look as follows: 
+curl https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-500bp-upstream-7species.mc9nr.feather --output mm9-500bp-upstream-7species.mc9nr.feather
+curl https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-tss-centered-10kb-7species.mc9nr.feather --output mm9-tss-centered-10kb-7species.mc9nr.feather
+
+
+We then initialize our SCENIC run. 
+```{r}
+scenicOptions <- initializeScenic(org = "mgi",
+                                  dbDir = "mousedb", dbs = "mousedb", nCores=1)
+```
+
+We will then load toy data sets derived from diaphragm cells from the Tabula Muris Consortium.
+```{r load_toy_data, eval = TRUE}
+data("countDat")
+data("normDat")
+data("sizeFactors")
+data("TF_names")
+data("target_names")
+```
+
+```{r run_zirf_genie3, eval = TRUE}
+#zirf_genie3 <- function(exprMatrix, countMatrix, regulators = NULL, targets = NULL, z,
+#                        rounds = 10, mtry = 5, ntree=100, nodesize=5, nlambda=10,
+#                        nCores = 1){
+zirf_genie3_fit <- zirf_genie3(normDat, countDat, regulators = TF_names,
+                               targets = union(target_names, TF_names),
+                               z = as.matrix(sizeFactors),
+                               nCores = 2)
+```
+
+```{r run_SCENIC}
+SCENIC_results <- scRNAzirf::run_SCENIC(scenicOptions = scenicOptions,
+                                        weightMatrix_list = zirf_genie3_fit,
+                                        log_scale = F,
+                                        exprMatrix = normDat)
+```
+
+
+
+
+
+
+
+
+

@@ -9,7 +9,7 @@ zirf_fit(
   x,
   z,
   y,
-  rounds,
+  rounds = 25,
   mtry,
   ntree = 100,
   nodesize = 5,
@@ -17,11 +17,12 @@ zirf_fit(
   zero_coef = NULL,
   newx = NULL,
   newz = NULL,
-  iter_keep_pi = F,
-  iter_keep_preds = F,
-  iter_keep_xsi = F,
+  iter_keep_pi = T,
+  iter_keep_preds = T,
+  iter_keep_xsi = T,
   nlambda = 10,
-  threshold_prob = F
+  threshold_prob = T,
+  epsilon = 0.01
 )
 }
 \arguments{
@@ -33,13 +34,13 @@ part of the model.}
 
 \item{y}{vector of count outcomes.}
 
-\item{rounds}{how many iterations the EM algorithm should be run.}
+\item{rounds}{how many iterations the EM algorithm should be run at maximum.}
 
 \item{mtry}{which value of mtry to use in each forest.}
 
-\item{ntree}{number of trees}
+\item{ntree}{number of trees.}
 
-\item{nodesize}{controls depth of regression trees}
+\item{nodesize}{controls depth of regression trees.}
 
 \item{count_coef}{values for initial estimate of count model.}
 
@@ -49,16 +50,20 @@ part of the model.}
 
 \item{newz}{A list of zero inflation model covariate matrices for new data.}
 
-\item{iter_keep_pi}{boolean, if TRUE values of pi are kept across EM iterations}
+\item{iter_keep_pi}{boolean, if TRUE values of pi are kept across EM iterations.}
 
-\item{iter_keep_preds}{boolean, if TRUE prediction values are kept across EM iterations}
+\item{iter_keep_preds}{boolean, if TRUE prediction values are kept across EM iterations.}
 
 \item{iter_keep_xsi}{boolean, if TRUE zero-inflation model coefficients
-are kept across EM iterations}
+are kept across EM iterations.}
 
-\item{nlambda}{number of folds of cross-validation}
+\item{nlambda}{number of folds of cross-validation.}
 
-\item{threshold_prob}{number of folds of cross-validation}
+\item{threshold_prob}{boolean, if TRUE.}
+
+\item{epsilon}{tolerance used for stopping iterations.
+The maximum difference in probability of inclusion.
+between iterations is the criterion.}
 }
 \value{
 A list.

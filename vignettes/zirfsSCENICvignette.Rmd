@@ -49,7 +49,7 @@ dbFiles <- c("https://resources.aertslab.org/cistarget/databases/mus_musculus/mm
 "https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-tss-centered-10kb-7species.mc9nr.feather")
 These files can be downloaded using either curl or wget.
 For example using curl would look as follows: 
-curl https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-500bp-upstream-7species.mc9nr.feather --output mm9-500bp-upstream-7species.mc9nr.feather
+<!-- curl https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-500bp-upstream-7species.mc9nr.feather --output mm9-500bp-upstream-7species.mc9nr.feather -->
 curl https://resources.aertslab.org/cistarget/databases/mus_musculus/mm9/refseq_r45/mc9nr/gene_based/mm9-tss-centered-10kb-7species.mc9nr.feather --output mm9-tss-centered-10kb-7species.mc9nr.feather
 
 
@@ -79,6 +79,7 @@ zirf_genie3_fit <- zirf_genie3(normDat, countDat, regulators = TF_names,
 ```
 
 ```{r run_SCENIC}
+library(BiocParallel)
 SCENIC_results <- scRNAzirf::run_SCENIC(scenicOptions = scenicOptions,
                                         weightMatrix_list = zirf_genie3_fit,
                                         log_scale = F,

@@ -15,7 +15,7 @@ single-cell RNA-seq (scRNA-seq) data. This package serves as
 ## Installation
 To install and use scRNAzirf you'll need download SCENIC. Directions for downloading
 SCENIC can be found at this link:
-https://htmlpreview.github.io/?https://github.com/aertslab/SCENIC/blob/master/inst/doc/SCENIC_Setup.html#installation.
+# https://htmlpreview.github.io/?https://github.com/aertslab/SCENIC/blob/master/inst/doc/SCENIC_Setup.html#installation.
 
 ## Example
 
@@ -28,6 +28,8 @@ suppressPackageStartupMessages({
   library(scRNAzirf)
   library(SCENIC)
   library(foreach)
+  library(BiocParallel)
+  library(doMC)
 })
 knitr::opts_knit$set(root.dir="zirfsSCENIC_vignette")
 ```
